@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hasil & Pembahasan - Simulasi CAT CPNS Guru</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">SIMULASI CAT <span>CPNS GURU</span></div>
+  <div class="meta" id="pesertaLabel"></div>
+</header>
+
+<main>
+  <div id="app" class="loading">Menghitung hasil…</div>
+</main>
+
+<script src="soal-data.js"></script>
+<script src="app.js"></script>
+<script>
+const soal = Store.get("soal");
+const peserta = Store.get("peserta");
+const jawaban = Store.get("jawaban", {});
+if (!soal || !peserta){ window.location.href = "index.html"; }
+
+document.getElementById("pesertaLabel").textContent = peserta.nama + (peserta.instansi ? " · " + peserta.instansi : "");
+
+const perKategori = hitungSkor(soal, jawaban);
+const grup = kelompokkanPerKategori(soal);
+
+function renderRingkasan(){
+  const boxes = Object.keys(perKategori).map(k=>{
+    const h = perKategori[k];
+    const info = KATEGORI_INFO[k] || { label:k };
+    let statusHtml = "";
+    if (info.passingGrade != null){
+      const lulus = h.skor >= info.passingGrade;
+      statusHtml = `<div class="status ${lulus?'pass':'fail'}" style="margin-top:6px">
+        ${lulus ? "≥ PG" : "< PG"} (${info.passingGrade})
+      </div>`;
+    }
+    return `<div class="score-box">
+      <div class="n">${h.skor}</div>
+      <div class="l">${info.label || k}<br>${h.benar} benar / ${h.total} soal</div>
+      ${statusHtml}
+    </div>`;
+  }).join("");
+
+  const skdKeys = ["TWK","TIU","TKP"].filter(k=>perKategori[k]);
+  let totalSkd = 0, semuaLulusPG = true;
+  skdKeys.forEach(k=>{
+    totalSkd += perKategori[k].skor;
+    const pg = KATEGORI_INFO[k].passingGrade;
+    if (perKategori[k].skor < pg) semuaLulusPG = false;
+  });
+
+  const ringkasanSkd = skdKeys.length ? `
+    <div class="card">
+      <h2>Ringkasan Nilai SKD (TWK + TIU + TKP)</h2>
+      <p class="lead">Total nilai kumulatif: <b>${totalSkd}</b> / 550 (skala resmi SKD CPNS)</p>
+      <span class="status ${semuaLulusPG?'pass':'fail'}">
+        ${semuaLulusPG ? "Memenuhi seluruh nilai ambang batas (Passing Grade)" : "Belum memenuhi nilai ambang batas pada salah satu komponen"}
+      </span>
+      <p class="small" style="margin-top:10px">
+        Passing grade acuan: TWK ≥ 65, TIU ≥ 80, TKP ≥ 166 (total maks. 550). Catatan: kelulusan SKD sesungguhnya juga
+        ditentukan oleh peringkat 3× jumlah formasi, dan nilai ambang batas resmi ditetapkan tiap tahun oleh KepmenPANRB —
+        selalu cek pengumuman resmi BKN/instansi untuk tahun berjalan.
+      </p>
+    </div>` : "";
+
+  return `
+    <div class="card">
+      <h1>Hasil Simulasi — ${peserta.nama}</h1>
+      <p class="lead">${peserta.instansi ? "Instansi/Sekolah tujuan: " + escapeHtml(peserta.instansi) : ""}</p>
+      <div class="score-grid">${boxes}</div>
+      <div class="actions">
+        <button class="btn-ghost" onclick="window.location.href='index.html'">Ulangi Simulasi</button>
+        <button class="btn-accent" id="simpanBtn">Simpan Hasil ke Google Sheet</button>
+      </div>
+      <p class="small" id="simpanStatus"></p>
+    </div>
+    ${ringkasanSkd}
+  `;
+}
+
+function renderPembahasan(){
+  return Object.keys(grup).map(k=>{
+    const info = KATEGORI_INFO[k] || { label:k };
+    const items = grup[k].map((s,i)=>{
+      const jwb = jawaban[s.id];
+      const benar = jwb === s.kunci;
+      const jwbLabel = jwb ? `${jwb}. ${s.pilihan[jwb]}` : "Tidak dijawab";
+      return `
+        <div class="review-item">
+          <div class="q">${i+1}. ${escapeHtml(s.soal)}</div>
+          <div class="ans ${jwb ? (benar?'correct':'wrong') : 'wrong'}">
+            Jawaban Anda: ${escapeHtml(jwbLabel)} ${jwb ? (benar ? "✓ Benar" : "✗ Salah") : ""}
+          </div>
+          ${!benar ? `<div class="ans correct">Kunci jawaban: ${s.kunci}. ${escapeHtml(s.pilihan[s.kunci])}</div>` : ""}
+          <div class="explain"><b>Pembahasan:</b> ${escapeHtml(s.pembahasan)}</div>
+        </div>`;
+    }).join("");
+    return `
+      <div class="card">
+        <h2>Pembahasan — ${info.label || k}</h2>
+        ${items}
+      </div>`;
+  }).join("");
+}
+
+document.getElementById("app").innerHTML = renderRingkasan() + renderPembahasan();
+
+document.getElementById("simpanBtn").addEventListener("click", async ()=>{
+  const statusEl = document.getElementById("simpanStatus");
+  statusEl.textContent = "Menyimpan…";
+  const payload = {
+    nama: peserta.nama,
+    instansi: peserta.instansi || "",
+    timestamp: new Date().toISOString(),
+    perKategori
+  };
+  const res = await simpanHasil(payload);
+  statusEl.textContent = res.ok ? "Hasil berhasil disimpan ke Google Sheet." : (res.info || "Gagal menyimpan.");
+});
+</script>
+</body>
+</html>

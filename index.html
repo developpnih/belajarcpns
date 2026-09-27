@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulasi CAT CPNS Guru</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">SIMULASI CAT <span>CPNS GURU</span></div>
+  <div class="meta">Latihan Mandiri · Bukan situs resmi BKN</div>
+</header>
+
+<main>
+  <div class="card">
+    <h1>Simulasi Ujian Seleksi Kompetensi Dasar (SKD) + Kompetensi Teknis Guru</h1>
+    <p class="lead">Sistem latihan mandiri mengikuti struktur resmi SKD CPNS (TWK, TIU, TKP) ditambah soal Kompetensi Teknis Guru, lengkap dengan pembahasan jawaban di akhir sesi.</p>
+
+    <div class="grid-cat" id="katInfo"><!-- diisi JS --></div>
+
+    <label for="nama">Nama Peserta</label>
+    <input type="text" id="nama" placeholder="Nama lengkap Anda">
+
+    <label for="instansi">Instansi / Sekolah Tujuan (opsional)</label>
+    <input type="text" id="instansi" placeholder="Contoh: SDN 01 Ketanggungan">
+
+    <div class="actions">
+      <button class="btn-primary" id="mulaiBtn">Mulai Ujian →</button>
+    </div>
+    <p class="small" id="statusApi" style="margin-top:14px"></p>
+  </div>
+
+  <div class="card">
+    <h2>Ketentuan</h2>
+    <ul class="small" style="line-height:1.8">
+      <li>Setiap kategori memiliki waktu pengerjaan sendiri dan berjalan otomatis (tidak bisa dijeda).</li>
+      <li>Jawaban dapat diubah selama waktu kategori tersebut masih berjalan.</li>
+      <li>Setelah seluruh kategori selesai, skor dan pembahasan setiap soal akan ditampilkan.</li>
+      <li>Soal yang tampil dapat berasal dari Google Sheet (jika sudah dihubungkan admin) atau bank soal contoh bawaan.</li>
+    </ul>
+  </div>
+</main>
+<footer class="foot">Dibuat untuk latihan mandiri · Data soal &amp; hasil dapat dihubungkan ke Google Sheets</footer>
+
+<script src="soal-data.js"></script>
+<script src="app.js"></script>
+<script>
+(async function(){
+  const soal = await ambilSoal();
+  const grup = kelompokkanPerKategori(soal);
+  const katInfo = document.getElementById("katInfo");
+  katInfo.innerHTML = Object.keys(grup).map(k=>{
+    const label = (KATEGORI_INFO[k] && KATEGORI_INFO[k].label) || k;
+    return `<div class="cat-pill"><b>${grup[k].length}</b>${label}</div>`;
+  }).join("");
+
+  document.getElementById("statusApi").textContent = CONFIG.API_URL
+    ? "Terhubung ke database soal Google Sheets."
+    : "Mode contoh aktif (soal lokal). Hubungkan Google Sheet melalui app.js untuk soal penuh — lihat README.md.";
+
+  document.getElementById("mulaiBtn").addEventListener("click", ()=>{
+    const nama = document.getElementById("nama").value.trim();
+    if (!nama){ alert("Mohon isi nama peserta terlebih dahulu."); return; }
+    const instansi = document.getElementById("instansi").value.trim();
+    Store.clear();
+    Store.set("peserta", { nama, instansi });
+    Store.set("soal", soal);
+    Store.set("jawaban", {});
+    Store.set("waktuMulai", Date.now());
+    window.location.href = "ujian.html";
+  });
+})();
+</script>
+</body>
+</html>

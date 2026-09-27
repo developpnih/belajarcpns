@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ujian Berlangsung - Simulasi CAT CPNS Guru</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">SIMULASI CAT <span>CPNS GURU</span></div>
+  <div class="meta" id="pesertaLabel"></div>
+</header>
+
+<main>
+  <div id="app" class="loading">Memuat soal…</div>
+</main>
+
+<script src="soal-data.js"></script>
+<script src="app.js"></script>
+<script>
+const soal = Store.get("soal");
+const peserta = Store.get("peserta");
+if (!soal || !peserta){ window.location.href = "index.html"; }
+
+document.getElementById("pesertaLabel").textContent = peserta.nama + (peserta.instansi ? " · " + peserta.instansi : "");
+
+const grup = kelompokkanPerKategori(soal);
+const urutanKategori = Object.keys(grup); // urutan sesuai kemunculan data
+let katIdx = Store.get("katIdx", 0);
+let soalIdx = Store.get("soalIdx", 0);
+let jawaban = Store.get("jawaban", {});
+let sisaDetik = Store.get("sisaDetik", null);
+let timerHandle = null;
+
+function mulaiTimerJikaBelum(){
+  const kat = urutanKategori[katIdx];
+  const info = KATEGORI_INFO[kat] || { detikPerSoal:60 };
+  const jumlahSoal = grup[kat].length;
+  if (sisaDetik === null){
+    sisaDetik = jumlahSoal * (info.detikPerSoal || 60);
+    Store.set("sisaDetik", sisaDetik);
+  }
+}
+
+function render(){
+  const kat = urutanKategori[katIdx];
+  const daftarSoal = grup[kat];
+  const s = daftarSoal[soalIdx];
+  const info = KATEGORI_INFO[kat] || { label: kat };
+
+  const navDots = daftarSoal.map((qq,i)=>{
+    const terjawab = jawaban[qq.id] ? "answered" : "";
+    const current = (i===soalIdx) ? "current" : "";
+    return `<button class="nav-dot ${terjawab} ${current}" data-i="${i}">${i+1}</button>`;
+  }).join("");
+
+  const opsi = Object.keys(s.pilihan).map(kode=>{
+    const dipilih = jawaban[s.id] === kode ? "selected" : "";
+    return `
+      <label class="opt ${dipilih}" data-kode="${kode}">
+        <input type="radio" name="opsi" value="${kode}" ${jawaban[s.id]===kode?"checked":""}>
+        <span><b>${kode}.</b> ${escapeHtml(s.pilihan[kode])}</span>
+      </label>`;
+  }).join("");
+
+  document.getElementById("app").innerHTML = `
+    <div class="exam-shell">
+      <div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <span class="q-tag">${info.label || kat} · Soal ${soalIdx+1} dari ${daftarSoal.length}</span>
+            <span class="timer" id="timerBox">⏱ --:--</span>
+          </div>
+          <p class="q-text">${escapeHtml(s.soal)}</p>
+          <div id="opsiWrap">${opsi}</div>
+          <div class="actions">
+            <button class="btn-ghost" id="prevBtn" ${soalIdx===0?"disabled":""}>← Sebelumnya</button>
+            <button class="btn-primary" id="nextBtn">${soalIdx===daftarSoal.length-1 ? "Selesai kategori ini" : "Selanjutnya →"}</button>
+          </div>
+        </div>
+      </div>
+      <div class="side-card">
+        <h3>Navigasi Soal — ${info.label || kat}</h3>
+        <div class="nav-grid">${navDots}</div>
+        <div class="legend">
+          <span><i class="dot ok"></i>Terjawab</span>
+          <span><i class="dot no"></i>Belum</span>
+        </div>
+        <div class="small" style="margin-top:14px">
+          Kategori ${katIdx+1} dari ${urutanKategori.length}
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.querySelectorAll(".opt").forEach(el=>{
+    el.addEventListener("click", ()=>{
+      jawaban[s.id] = el.dataset.kode;
+      Store.set("jawaban", jawaban);
+      render();
+    });
+  });
+  document.getElementById("prevBtn").addEventListener("click", ()=>{
+    soalIdx = Math.max(0, soalIdx-1);
+    Store.set("soalIdx", soalIdx);
+    render();
+  });
+  document.getElementById("nextBtn").addEventListener("click", ()=>{
+    if (soalIdx < daftarSoal.length-1){
+      soalIdx++;
+      Store.set("soalIdx", soalIdx);
+      render();
+    } else {
+      lanjutKategoriBerikutnya();
+    }
+  });
+  document.querySelectorAll(".nav-dot").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      soalIdx = parseInt(btn.dataset.i,10);
+      Store.set("soalIdx", soalIdx);
+      render();
+    });
+  });
+
+  updateTimerDisplay();
+}
+
+function lanjutKategoriBerikutnya(){
+  clearInterval(timerHandle);
+  katIdx++;
+  soalIdx = 0;
+  sisaDetik = null;
+  Store.set("katIdx", katIdx);
+  Store.set("soalIdx", soalIdx);
+  Store.set("sisaDetik", sisaDetik);
+  if (katIdx >= urutanKategori.length){
+    selesaikanUjian();
+  } else {
+    mulaiTimerJikaBelum();
+    render();
+    jalankanTimer();
+  }
+}
+
+function selesaikanUjian(){
+  Store.set("waktuSelesai", Date.now());
+  window.location.href = "hasil.html";
+}
+
+function updateTimerDisplay(){
+  const box = document.getElementById("timerBox");
+  if (!box) return;
+  box.textContent = "⏱ " + formatWaktu(sisaDetik);
+  box.classList.toggle("low", sisaDetik <= 30);
+}
+
+function jalankanTimer(){
+  clearInterval(timerHandle);
+  timerHandle = setInterval(()=>{
+    sisaDetik--;
+    Store.set("sisaDetik", sisaDetik);
+    updateTimerDisplay();
+    if (sisaDetik <= 0){
+      lanjutKategoriBerikutnya();
+    }
+  }, 1000);
+}
+
+mulaiTimerJikaBelum();
+render();
+jalankanTimer();
+</script>
+</body>
+</html>
