@@ -3,7 +3,7 @@
 // ISI URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI setelah deploy (lihat README.md).
 // Jika dikosongkan, sistem otomatis memakai bank soal contoh di soal-data.js.
 const CONFIG = {
-  API_URL: "" // contoh: "https://script.google.com/macros/s/XXXXXXXXXXXX/exec"
+  API_URL: "https://script.google.com/macros/s/AKfycbzUPKm7oeRII0Zn22MKsV90juf7TdsAhvDKnQhgpm0sLXYYySpJGOMebCPuE2MpKUQRFw/exec" // contoh: "https://script.google.com/macros/s/XXXXXXXXXXXX/exec"
 };
 // ======================================================================
 
