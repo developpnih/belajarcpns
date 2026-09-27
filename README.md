@@ -76,6 +76,39 @@ hasil simulasi (nama, skor per kategori, total SKD) ke sheet `HASIL`.
 > Setiap kali Anda mengubah isi sheet `SOAL`, tidak perlu deploy ulang — cukup refresh halaman
 > `index.html`. Jika Anda mengubah *kode* di `Code.gs`, deploy ulang lewat **Deploy > Manage deployments > Edit > New version**.
 
+## 2.d Troubleshooting: "sudah dihubungkan tapi tetap pakai soal contoh / gagal simpan"
+
+Di `index.html` sekarang ada tombol **"Tes Koneksi Google Sheet"** — klik ini dulu untuk melihat
+pesan error yang sebenarnya (bukan sekadar gagal generik). Penyebab paling umum:
+
+1. **Deployment belum di-update setelah edit `Code.gs`.**
+   Mengubah kode script *tidak* otomatis memperbarui URL `/exec` yang sudah ada. Setiap habis
+   mengubah `Code.gs`, buka **Deploy > Manage deployments > (ikon pensil) Edit > Version: New version > Deploy**.
+
+2. **Akses deployment bukan "Anyone".**
+   Saat deploy, pastikan *Who has access* diatur **Anyone** (bukan "Anyone with Google account" atau
+   "Only myself"), kalau tidak, permintaan dari GitHub Pages akan ditolak/redirect ke halaman login Google.
+
+3. **Belum melakukan authorize.**
+   Saat pertama kali Deploy, akan muncul layar izin (Authorize access) — klik akun Google Anda,
+   klik "Advanced" > "Go to (nama project) (unsafe)" jika muncul peringatan, lalu Allow. Tanpa ini,
+   Apps Script akan membalas halaman HTML "membutuhkan otorisasi", bukan JSON.
+
+4. **Nama sheet atau header kolom tidak persis sama.**
+   Nama tab harus **`SOAL`** (huruf besar semua, tanpa spasi). Header baris 1 harus persis:
+   `ID, Kategori, Soal, A, B, C, D, E, Kunci, Pembahasan` — beda huruf besar/kecil atau ada
+   spasi ekstra akan membuat sistem menganggap data kosong.
+
+5. **URL yang dipakai adalah URL `/dev`, bukan `/exec`.**
+   Gunakan URL hasil **Deploy** (berakhiran `/exec`), bukan URL dari mode "Test deployments" (`/dev`)
+   yang hanya bisa diakses oleh akun Anda sendiri.
+
+Cara cek manual paling cepat: tempel URL Web App + `?action=soal` (contoh:
+`https://script.google.com/macros/s/xxxx/exec?action=soal`) langsung ke address bar browser.
+Jika muncul JSON berisi daftar soal, berarti backend sudah benar dan masalahnya ada di sisi
+frontend (`API_URL` di `app.js` salah salin/ada spasi). Jika muncul halaman HTML/izin login,
+berarti masalah ada di poin 2 atau 3 di atas.
+
 ## 3. Deploy ke GitHub Pages
 
 1. Buat repository baru di GitHub, unggah seluruh isi folder `cpns-sim/` (bukan folder `apps-script`

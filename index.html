@@ -25,7 +25,8 @@
     <label for="instansi">Instansi / Sekolah Tujuan (opsional)</label>
     <input type="text" id="instansi" placeholder="Contoh: SDN 01 Ketanggungan">
 
-    <div class="actions">
+    <div class="actions" style="justify-content:space-between">
+      <button class="btn-ghost" id="tesBtn">Tes Koneksi Google Sheet</button>
       <button class="btn-primary" id="mulaiBtn">Mulai Ujian →</button>
     </div>
     <p class="small" id="statusApi" style="margin-top:14px"></p>
@@ -55,9 +56,29 @@
     return `<div class="cat-pill"><b>${grup[k].length}</b>${label}</div>`;
   }).join("");
 
-  document.getElementById("statusApi").textContent = CONFIG.API_URL
-    ? "Terhubung ke database soal Google Sheets."
-    : "Mode contoh aktif (soal lokal). Hubungkan Google Sheet melalui app.js untuk soal penuh — lihat README.md.";
+  const statusEl = document.getElementById("statusApi");
+  if (!CONFIG.API_URL) {
+    statusEl.innerHTML = "Mode contoh aktif (soal lokal). Hubungkan Google Sheet melalui <code>app.js</code> untuk soal penuh — lihat README.md.";
+  } else if (KoneksiInfo.sumber === "sheet") {
+    statusEl.innerHTML = "✅ " + KoneksiInfo.pesan;
+    statusEl.style.color = "var(--ok)";
+  } else {
+    statusEl.innerHTML = "⚠️ Belum terhubung ke Google Sheet, memakai soal contoh sementara. " + KoneksiInfo.pesan + "<br>Klik \"Tes Koneksi Google Sheet\" untuk detail, atau lihat bagian Troubleshooting di README.md.";
+    statusEl.style.color = "var(--bad)";
+  }
+
+  document.getElementById("tesBtn").addEventListener("click", async ()=>{
+    statusEl.style.color = "var(--muted)";
+    statusEl.textContent = "Menguji koneksi…";
+    const hasil = await ujiKoneksiApi();
+    if (hasil.ok){
+      statusEl.style.color = "var(--ok)";
+      statusEl.textContent = "✅ " + hasil.pesan;
+    } else {
+      statusEl.style.color = "var(--bad)";
+      statusEl.innerHTML = "❌ " + hasil.pesan + (hasil.detail ? `<br><span class="small">Detail teknis: ${escapeHtml(hasil.detail)}</span>` : "");
+    }
+  });
 
   document.getElementById("mulaiBtn").addEventListener("click", ()=>{
     const nama = document.getElementById("nama").value.trim();

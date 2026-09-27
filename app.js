@@ -3,7 +3,7 @@
 // ISI URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI setelah deploy (lihat README.md).
 // Jika dikosongkan, sistem otomatis memakai bank soal contoh di soal-data.js.
 const CONFIG = {
-  API_URL: "https://script.google.com/macros/s/AKfycbzVadz9viNVoVkXTJABqz6muYwuI3m_On5ygoGEoN7KzQKeMys6D34Uje8OGA2FtQ3LmA/exec" // contoh: "https://script.google.com/macros/s/XXXXXXXXXXXX/exec"
+  API_URL: "" // contoh: "https://script.google.com/macros/s/XXXXXXXXXXXX/exec"
 };
 // ======================================================================
 
@@ -16,31 +16,87 @@ const Store = {
   clear(){ sessionStorage.clear(); }
 };
 
+// Menyimpan diagnosa terakhir agar bisa ditampilkan di UI (mis. status di index.html)
+const KoneksiInfo = { sumber: "contoh", pesan: "", detail: "" };
+
+async function ujiKoneksiApi(){
+  // Dipakai tombol "Tes Koneksi" di index.html untuk diagnosa langsung ke pengguna.
+  if (!CONFIG.API_URL) {
+    return { ok:false, pesan:"API_URL masih kosong di app.js." };
+  }
+  try {
+    const res = await fetch(CONFIG.API_URL + "?action=soal", { cache:"no-store" });
+    const teks = await res.text();
+    let data;
+    try { data = JSON.parse(teks); }
+    catch(parseErr){
+      return {
+        ok:false,
+        pesan:"Respons dari Apps Script bukan JSON (kemungkinan halaman error/izin login Google).",
+        detail: teks.slice(0,300)
+      };
+    }
+    if (data && data.error){
+      return { ok:false, pesan:"Apps Script mengembalikan error: " + data.error, detail: JSON.stringify(data) };
+    }
+    if (!Array.isArray(data)){
+      return { ok:false, pesan:"Format data tidak sesuai (bukan array soal).", detail: JSON.stringify(data).slice(0,300) };
+    }
+    if (data.length === 0){
+      return { ok:false, pesan:"Terhubung, tetapi sheet 'SOAL' kosong atau header kolom tidak cocok persis (ID, Kategori, Soal, A, B, C, D, E, Kunci, Pembahasan)." };
+    }
+    return { ok:true, pesan:`Terhubung. ${data.length} soal terbaca dari Google Sheet.`, jumlah:data.length };
+  } catch(e){
+    return {
+      ok:false,
+      pesan:"Gagal fetch ke Apps Script (kemungkinan CORS/izin akses atau URL salah).",
+      detail: String(e)
+    };
+  }
+}
+
 async function ambilSoal(){
-  if (CONFIG.API_URL) {
+  if (!CONFIG.API_URL) {
+    KoneksiInfo.sumber = "contoh";
+    KoneksiInfo.pesan = "API_URL belum diisi.";
+    return SOAL_BANK;
+  }
+  const uji = await ujiKoneksiApi();
+  if (uji.ok) {
     try {
-      const res = await fetch(CONFIG.API_URL + "?action=soal");
+      const res = await fetch(CONFIG.API_URL + "?action=soal", { cache:"no-store" });
       const data = await res.json();
-      if (Array.isArray(data) && data.length) return data;
-    } catch (e) {
-      console.warn("Gagal ambil soal dari Google Sheet, memakai bank soal contoh.", e);
+      KoneksiInfo.sumber = "sheet";
+      KoneksiInfo.pesan = uji.pesan;
+      return data;
+    } catch(e){
+      // fallback tak terduga meski uji koneksi sukses
     }
   }
+  KoneksiInfo.sumber = "contoh";
+  KoneksiInfo.pesan = uji.pesan + (uji.detail ? " Detail: " + uji.detail : "");
+  console.warn("Memakai bank soal contoh. Alasan:", uji.pesan, uji.detail || "");
   return SOAL_BANK;
 }
 
 async function simpanHasil(payload){
   if (!CONFIG.API_URL) return { ok:false, info:"API_URL belum diatur, hasil hanya tersimpan di sesi ini." };
   try {
-    await fetch(CONFIG.API_URL, {
+    const res = await fetch(CONFIG.API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" }, // hindari preflight CORS pada Apps Script
       body: JSON.stringify({ action: "simpanHasil", ...payload })
     });
-    return { ok:true };
+    const teks = await res.text();
+    let data;
+    try { data = JSON.parse(teks); } catch(e){
+      return { ok:false, info:"Respons Apps Script bukan JSON (cek deployment/izin akses)." };
+    }
+    if (data && data.ok) return { ok:true };
+    return { ok:false, info: "Apps Script menolak: " + (data && data.error ? data.error : "alasan tidak diketahui") };
   } catch(e){
     console.warn("Gagal menyimpan hasil ke Google Sheet.", e);
-    return { ok:false, info:"Gagal terhubung ke Google Sheet." };
+    return { ok:false, info:"Gagal terhubung ke Google Sheet (cek koneksi/deployment). Detail: " + String(e) };
   }
 }
 

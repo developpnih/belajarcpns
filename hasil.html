@@ -36,8 +36,8 @@ function renderRingkasan(){
     let statusHtml = "";
     if (info.passingGrade != null){
       const lulus = h.skor >= info.passingGrade;
-      statusHtml = `<div class="status ${lulus?'pass':'fail'}" style="margin-top:6px">
-        ${lulus ? "≥ PG" : "< PG"} (${info.passingGrade})
+      statusHtml = `<div class="status ${lulus?'pass':'fail'}">
+        ${lulus ? "✓ Memenuhi PG" : "✗ Di bawah PG"} (min. ${info.passingGrade})
       </div>`;
     }
     return `<div class="score-box">
